@@ -9,11 +9,12 @@ import com.artipie.http.auth.Authentication;
 import com.artipie.http.auth.BasicAuthScheme;
 import com.artipie.http.headers.Authorization;
 import com.artipie.http.rq.RqHeaders;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import org.cactoos.text.Base64Decoded;
+import org.apache.commons.codec.binary.Base64;
 
 /**
  * {@link AuthScheme} implementation for gem api key decoding.
@@ -49,8 +50,10 @@ public final class GemApiKeyAuth implements AuthScheme {
                     } else {
                         res = CompletableFuture.completedFuture(
                             Optional.of(str)
-                                .map(Base64Decoded::new)
-                                .map(dec -> dec.toString().split(":"))
+                                .map(item -> item.getBytes(StandardCharsets.UTF_8))
+                                .map(Base64::decodeBase64)
+                                .map(String::new)
+                                .map(dec -> dec.split(":"))
                                 .flatMap(
                                     cred -> this.auth.user(cred[0].trim(), cred[1].trim())
                                 )

@@ -67,13 +67,13 @@ SOFTWARE.
     <!-- Artipie -->
     <dependency>
       <groupId>com.artipie</groupId>
-      <artifactId>asto</artifactId>
-      <version>v1.11.0</version>
+      <artifactId>asto-core</artifactId>
+      <version>v1.15.1</version>
     </dependency>
     <dependency>
       <groupId>com.artipie</groupId>
       <artifactId>http</artifactId>
-      <version>v0.26.1</version>
+      <version>v1.1.5</version>
     </dependency>
     <!-- JRuby -->
     <dependency>
@@ -90,6 +90,11 @@ SOFTWARE.
           <artifactId>snakeyaml</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+      <version>1.33</version>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>
@@ -168,6 +173,12 @@ SOFTWARE.
       <artifactId>tuples</artifactId>
       <version>0.1.2</version>
     </dependency>
+    <dependency>
+      <groupId>org.cactoos</groupId>
+      <artifactId>cactoos</artifactId>
+      <version>0.46</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
   <build>
     <resources>
@@ -210,6 +221,7 @@ SOFTWARE.
       <plugin>
         <groupId>com.jcabi</groupId>
         <artifactId>jcabi-maven-plugin</artifactId>
+        <version>0.17.0</version>
         <executions>
           <execution>
             <id>jcabi-versionalize-packages</id>
