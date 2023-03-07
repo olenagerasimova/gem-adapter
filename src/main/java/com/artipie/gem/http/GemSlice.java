@@ -10,8 +10,6 @@ import com.artipie.http.Slice;
 import com.artipie.http.auth.Authentication;
 import com.artipie.http.auth.AuthzSlice;
 import com.artipie.http.auth.OperationControl;
-import com.artipie.http.auth.Permission;
-import com.artipie.http.auth.Permissions;
 import com.artipie.http.rq.RqMethod;
 import com.artipie.http.rs.RsStatus;
 import com.artipie.http.rs.RsWithStatus;
@@ -24,7 +22,6 @@ import com.artipie.http.slice.SliceSimple;
 import com.artipie.security.perms.Action;
 import com.artipie.security.perms.AdapterBasicPermission;
 import com.artipie.security.policy.Policy;
-import java.util.Optional;
 
 /**
  * A slice, which servers gem packages.
