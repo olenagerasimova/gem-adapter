@@ -5,6 +5,7 @@
 package com.artipie.gem;
 
 import com.artipie.http.auth.AuthScheme;
+import com.artipie.http.auth.AuthUser;
 import com.artipie.http.auth.Authentication;
 import com.artipie.http.auth.BasicAuthScheme;
 import com.artipie.http.headers.Authorization;
@@ -77,19 +78,19 @@ public final class GemApiKeyAuth implements AuthScheme {
         /**
          * Authenticated user.
          */
-        private final Authentication.User usr;
+        private final AuthUser usr;
 
         /**
          * Ctor.
          *
          * @param user Authenticated user.
          */
-        Success(final Authentication.User user) {
+        Success(final AuthUser user) {
             this.usr = user;
         }
 
         @Override
-        public Optional<Authentication.User> user() {
+        public Optional<AuthUser> user() {
             return Optional.of(this.usr);
         }
 
@@ -107,7 +108,7 @@ public final class GemApiKeyAuth implements AuthScheme {
     private static class Failure implements AuthScheme.Result {
 
         @Override
-        public Optional<Authentication.User> user() {
+        public Optional<AuthUser> user() {
             return Optional.empty();
         }
 

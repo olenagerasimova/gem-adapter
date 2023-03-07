@@ -7,9 +7,9 @@ package com.artipie.gem.http;
 import com.artipie.asto.Storage;
 import com.artipie.gem.GemApiKeyAuth;
 import com.artipie.http.Slice;
-import com.artipie.http.auth.Action;
-import com.artipie.http.auth.AuthSlice;
 import com.artipie.http.auth.Authentication;
+import com.artipie.http.auth.AuthzSlice;
+import com.artipie.http.auth.OperationControl;
 import com.artipie.http.auth.Permission;
 import com.artipie.http.auth.Permissions;
 import com.artipie.http.rq.RqMethod;
@@ -21,6 +21,9 @@ import com.artipie.http.rt.RtRulePath;
 import com.artipie.http.rt.SliceRoute;
 import com.artipie.http.slice.SliceDownload;
 import com.artipie.http.slice.SliceSimple;
+import com.artipie.security.perms.Action;
+import com.artipie.security.perms.AdapterBasicPermission;
+import com.artipie.security.policy.Policy;
 import java.util.Optional;
 
 /**
@@ -40,22 +43,21 @@ public final class GemSlice extends Slice.Wrap {
      * @param storage The storage.
      */
     public GemSlice(final Storage storage) {
-        this(storage,
-            Permissions.FREE,
-            (login, pwd) -> Optional.of(new Authentication.User("anonymous"))
-        );
+        this(storage, Policy.FREE, Authentication.ANONYMOUS, "");
     }
 
     /**
      * Ctor.
      *
      * @param storage The storage.
-     * @param permissions The permissions.
+     * @param policy The policy.
      * @param auth The auth.
+     * @param name Repository name
      */
     public GemSlice(final Storage storage,
-        final Permissions permissions,
-        final Authentication auth) {
+        final Policy<?> policy,
+        final Authentication auth,
+        final String name) {
         super(
             new SliceRoute(
                 new RtRulePath(
@@ -63,10 +65,12 @@ public final class GemSlice extends Slice.Wrap {
                         ByMethodsRule.Standard.POST,
                         new RtRule.ByPath("/api/v1/gems")
                     ),
-                    new AuthSlice(
+                    new AuthzSlice(
                         new SubmitGemSlice(storage),
                         new GemApiKeyAuth(auth),
-                        new Permission.ByName(permissions, Action.Standard.WRITE)
+                        new OperationControl(
+                            policy, new AdapterBasicPermission(name, Action.Standard.WRITE)
+                        )
                     )
                 ),
                 new RtRulePath(
@@ -92,10 +96,12 @@ public final class GemSlice extends Slice.Wrap {
                 ),
                 new RtRulePath(
                     new ByMethodsRule(RqMethod.GET),
-                    new AuthSlice(
+                    new AuthzSlice(
                         new SliceDownload(storage),
                         new GemApiKeyAuth(auth),
-                        new Permission.ByName(permissions, Action.Standard.READ)
+                        new OperationControl(
+                            policy, new AdapterBasicPermission(name, Action.Standard.READ)
+                        )
                     )
                 ),
                 new RtRulePath(
