@@ -10,7 +10,6 @@ import com.artipie.gem.http.GemSlice;
 import com.artipie.http.Headers;
 import com.artipie.http.Response;
 import com.artipie.http.auth.Authentication;
-import com.artipie.http.auth.Permissions;
 import com.artipie.http.headers.Authorization;
 import com.artipie.http.headers.Header;
 import com.artipie.http.hm.RsHasBody;
@@ -18,10 +17,15 @@ import com.artipie.http.hm.RsHasHeaders;
 import com.artipie.http.hm.RsHasStatus;
 import com.artipie.http.rq.RequestLine;
 import com.artipie.http.rs.RsStatus;
+import com.artipie.security.perms.Action;
+import com.artipie.security.perms.AdapterBasicPermission;
+import com.artipie.security.perms.EmptyPermissions;
+import com.artipie.security.policy.PolicyByUsername;
 import io.reactivex.Flowable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.PermissionCollection;
 import java.util.Arrays;
 import org.cactoos.text.Base64Encoded;
 import org.hamcrest.MatcherAssert;
@@ -55,11 +59,7 @@ public class AuthTest {
     @Test
     public void unauthorizedWhenNoIdentity() {
         MatcherAssert.assertThat(
-            new GemSlice(
-                new InMemoryStorage(),
-                Permissions.FREE,
-                Authentication.ANONYMOUS
-            ).response(
+            new GemSlice(new InMemoryStorage()).response(
                 new RequestLine("GET", "/api/v1/api_key").toString(),
                 new Headers.From(),
                 Flowable.empty()
@@ -72,11 +72,24 @@ public class AuthTest {
         final String lgn = "usr";
         final String pwd = "pwd";
         final String token = new Base64Encoded(String.format("%s:%s", lgn, pwd)).asString();
+        final String repo = "test";
         MatcherAssert.assertThat(
             new GemSlice(
                 new InMemoryStorage(),
-                new Permissions.Single(lgn, "download"),
-                new Authentication.Single(lgn, pwd)
+                user -> {
+                    final PermissionCollection res;
+                    if (user.name().equals(lgn)) {
+                        final AdapterBasicPermission perm =
+                            new AdapterBasicPermission(repo, Action.Standard.READ);
+                        res = perm.newPermissionCollection();
+                        res.add(perm);
+                    } else {
+                        res = EmptyPermissions.INSTANCE;
+                    }
+                    return res;
+                },
+                new Authentication.Single(lgn, pwd),
+                repo
             ).response(
                 new RequestLine("POST", "/api/v1/gems").toString(),
                 new Headers.From(new Authorization(token)),
@@ -93,8 +106,9 @@ public class AuthTest {
         MatcherAssert.assertThat(
             new GemSlice(
                 new InMemoryStorage(),
-                new Permissions.Single(String.format("another %s", lgn), "download"),
-                new Authentication.Single(lgn, pwd)
+                new PolicyByUsername("another user"),
+                new Authentication.Single(lgn, pwd),
+                "test"
             ).response(
                 new RequestLine("GET", "specs.4.8").toString(),
                 new Headers.From(new Authorization(token)),
@@ -135,8 +149,9 @@ public class AuthTest {
         }
         return new GemSlice(
             new InMemoryStorage(),
-            new Permissions.Single(user, "upload"),
-            new Authentication.Single(user, pswd)
+            new PolicyByUsername(user),
+            new Authentication.Single(user, pswd),
+            "test"
         ).response(
             new RequestLine("POST", "/api/v1/gems").toString(),
             new Headers.From(
