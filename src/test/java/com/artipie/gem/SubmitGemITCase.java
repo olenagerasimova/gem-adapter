@@ -7,6 +7,8 @@ package com.artipie.gem;
 import com.artipie.asto.fs.FileStorage;
 import com.artipie.gem.http.GemSlice;
 import com.artipie.http.rs.RsStatus;
+import com.artipie.scheduling.ArtifactEvent;
+import com.artipie.scheduling.EventQueue;
 import com.artipie.vertx.VertxSliceServer;
 import io.vertx.reactivex.core.Vertx;
 import io.vertx.reactivex.core.buffer.Buffer;
@@ -29,10 +31,11 @@ public class SubmitGemITCase {
 
     @Test
     public void submitResultsInOkResponse(@TempDir final Path temp) throws IOException {
+        final EventQueue<ArtifactEvent> events = new EventQueue<>();
         final Vertx vertx = Vertx.vertx();
         final VertxSliceServer server = new VertxSliceServer(
             vertx,
-            new GemSlice(new FileStorage(temp))
+            new GemSlice(new FileStorage(temp), events)
         );
         final WebClient web = WebClient.create(vertx);
         final int port = server.start();
@@ -47,6 +50,7 @@ public class SubmitGemITCase {
             code,
             new IsEqual<>(Integer.parseInt(RsStatus.CREATED.code()))
         );
+        MatcherAssert.assertThat("Upload event was added to queue", events.size() == 1);
         web.close();
         server.close();
         vertx.close();

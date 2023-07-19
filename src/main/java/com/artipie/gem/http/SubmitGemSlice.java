@@ -5,24 +5,37 @@
 package com.artipie.gem.http;
 
 import com.artipie.asto.Key;
+import com.artipie.asto.Meta;
 import com.artipie.asto.Storage;
 import com.artipie.gem.Gem;
+import com.artipie.http.Headers;
 import com.artipie.http.Response;
 import com.artipie.http.Slice;
 import com.artipie.http.async.AsyncResponse;
+import com.artipie.http.headers.Login;
+import com.artipie.http.rq.RqHeaders;
 import com.artipie.http.rs.RsStatus;
 import com.artipie.http.rs.RsWithStatus;
 import com.artipie.http.slice.ContentWithSize;
+import com.artipie.scheduling.ArtifactEvent;
+import com.artipie.scheduling.EventQueue;
 import java.nio.ByteBuffer;
 import java.util.Map.Entry;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.reactivestreams.Publisher;
 
 /**
  * A slice, which servers gem packages.
  * @since 1.0
+ * @checkstyle ClassDataAbstractionCouplingCheck (500 lines)
  */
 final class SubmitGemSlice implements Slice {
+
+    /**
+     * Repository type.
+     */
+    private static final String REPO_TYPE = "gem";
 
     /**
      * Repository storage.
@@ -35,13 +48,28 @@ final class SubmitGemSlice implements Slice {
     private final Gem gem;
 
     /**
+     * Artifact events.
+     */
+    private final EventQueue<ArtifactEvent> events;
+
+    /**
+     * Repository name.
+     */
+    private final String name;
+
+    /**
      * Ctor.
      *
      * @param storage The storage.
+     * @param events Artifact events
+     * @param name Repository name
      */
-    SubmitGemSlice(final Storage storage) {
+    SubmitGemSlice(final Storage storage, final EventQueue<ArtifactEvent> events,
+        final String name) {
         this.storage = storage;
         this.gem = new Gem(storage);
+        this.events = events;
+        this.name = name;
     }
 
     @Override
@@ -53,9 +81,27 @@ final class SubmitGemSlice implements Slice {
         return new AsyncResponse(
             this.storage.save(
                 key, new ContentWithSize(body, headers)
-            ).thenCompose(none -> this.gem.update(key))
-            .thenCompose(none -> this.storage.delete(key))
-            .thenApply(none -> new RsWithStatus(RsStatus.CREATED))
+            ).thenCompose(
+                none -> this.gem.update(key).thenCompose(
+                    pair -> new RqHeaders(headers, "content-length")
+                        .stream().findFirst().map(Long::parseLong)
+                        .map(CompletableFuture::completedFuture)
+                        .orElseGet(
+                            () -> this.storage.metadata(key)
+                                .thenApply(mets -> mets.read(Meta.OP_SIZE).get())
+                        ).thenAccept(
+                            size -> this.events.put(
+                                new ArtifactEvent(
+                                    SubmitGemSlice.REPO_TYPE, this.name,
+                                    new Login(new Headers.From(headers)).getValue(),
+                                    pair.getKey(), pair.getValue(), size
+                                )
+                            )
+                        )
+                    )
+                )
+                .thenCompose(none -> this.storage.delete(key))
+                .thenApply(none -> new RsWithStatus(RsStatus.CREATED))
         );
     }
 }

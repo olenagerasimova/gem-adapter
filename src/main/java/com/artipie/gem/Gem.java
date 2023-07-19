@@ -9,7 +9,6 @@ import com.artipie.asto.Copy;
 import com.artipie.asto.Key;
 import com.artipie.asto.Storage;
 import com.artipie.asto.fs.FileStorage;
-import com.artipie.asto.misc.UncheckedIOFunc;
 import com.artipie.asto.misc.UncheckedSupplier;
 import com.artipie.gem.GemMeta.MetaInfo;
 import com.artipie.gem.ruby.RubyGemDependencies;
@@ -31,7 +30,8 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
-import wtf.g4s8.tuples.Pair;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * An SDK, which servers gem packages.
@@ -78,28 +78,33 @@ public final class Gem {
      * @param gem Ruby gem for indexing
      * @return Completable action
      */
-    public CompletionStage<Void> update(final Key gem) {
+    public CompletionStage<Pair<String, String>> update(final Key gem) {
         return newTempDir().thenCompose(
             tmp -> new Copy(
                 this.storage, key -> META_NAMES.contains(key) || key.equals(gem)
             ).copy(new FileStorage(tmp)).thenCompose(
                 ignore -> this.shared.apply(RubyGemMeta::new)
                     .thenApply(meta -> meta.info(tmp.resolve(gem.string())))
-                    .thenApply(info -> info.toString(new RevisionFormat()))
-            ).thenApplyAsync(
-                new UncheckedIOFunc<>(
-                    name -> Files.move(
-                        tmp.resolve(gem.string()),
-                        gem.parent().map(key -> tmp.resolve(key.string()))
-                            .orElse(tmp).resolve(name)
+                    .thenCompose(
+                        info -> {
+                            final RevisionFormat fmt = new RevisionFormat();
+                            final String name = info.toString(fmt);
+                            return CompletableFuture.supplyAsync(
+                                new UncheckedSupplier<>(
+                                    () -> Files.move(
+                                        tmp.resolve(gem.string()),
+                                        gem.parent().map(key -> tmp.resolve(key.string()))
+                                            .orElse(tmp).resolve(name)
+                                    )
+                                )
+                            ).thenCompose(
+                                path -> this.shared.apply(RubyGemIndex::new)
+                                    .thenAccept(index -> index.update(path))
+                                ).thenCompose(
+                                    ignored -> new Copy(new FileStorage(tmp)).copy(this.storage)
+                                ).thenApply(ignored -> new ImmutablePair<>(fmt.name, fmt.version));
+                        }
                     )
-                )
-            ).thenCompose(
-                path -> this.shared.apply(RubyGemIndex::new).thenAcceptAsync(
-                    index -> index.update(path)
-                )
-            ).thenCompose(
-                ignore -> new Copy(new FileStorage(tmp)).copy(this.storage)
             ).handle(removeTempDir(tmp))
         );
     }
@@ -142,9 +147,9 @@ public final class Gem {
                         keys -> keys.stream()
                             .map(key -> tmp.resolve(key.string()))
                             .collect(Collectors.toSet())
-                    ).thenApply(paths -> Pair.of(deps, paths))
+                    ).thenApply(paths -> new ImmutablePair<>(deps, paths))
                 ).thenApply(
-                    tuple -> tuple.apply((deps, paths) -> deps.dependencies(paths))
+                    tuple -> tuple.getLeft().dependencies(tuple.getRight())
                 )
             ).handle(removeTempDir(tmp))
         );
