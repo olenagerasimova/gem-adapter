@@ -19,6 +19,8 @@ import com.artipie.http.rt.RtRulePath;
 import com.artipie.http.rt.SliceRoute;
 import com.artipie.http.slice.SliceDownload;
 import com.artipie.http.slice.SliceSimple;
+import com.artipie.scheduling.ArtifactEvent;
+import com.artipie.scheduling.EventQueue;
 import com.artipie.security.perms.Action;
 import com.artipie.security.perms.AdapterBasicPermission;
 import com.artipie.security.policy.Policy;
@@ -40,7 +42,17 @@ public final class GemSlice extends Slice.Wrap {
      * @param storage The storage.
      */
     public GemSlice(final Storage storage) {
-        this(storage, Policy.FREE, Authentication.ANONYMOUS, "");
+        this(storage, Policy.FREE, Authentication.ANONYMOUS, "", new EventQueue<>());
+    }
+
+    /**
+     * Ctor.
+     *
+     * @param storage The storage.
+     * @param events Artifact events queue
+     */
+    public GemSlice(final Storage storage, final EventQueue<ArtifactEvent> events) {
+        this(storage, Policy.FREE, Authentication.ANONYMOUS, "", events);
     }
 
     /**
@@ -51,10 +63,31 @@ public final class GemSlice extends Slice.Wrap {
      * @param auth The auth.
      * @param name Repository name
      */
-    public GemSlice(final Storage storage,
+    public GemSlice(
+        final Storage storage,
         final Policy<?> policy,
         final Authentication auth,
-        final String name) {
+        final String name
+    ) {
+        this(storage, policy, auth, name, new EventQueue<>());
+    }
+
+    /**
+     * Ctor.
+     *
+     * @param storage The storage.
+     * @param policy The policy.
+     * @param auth The auth.
+     * @param name Repository name
+     * @param events Artifact events queue
+     */
+    public GemSlice(
+        final Storage storage,
+        final Policy<?> policy,
+        final Authentication auth,
+        final String name,
+        final EventQueue<ArtifactEvent> events
+    ) {
         super(
             new SliceRoute(
                 new RtRulePath(
@@ -63,7 +96,7 @@ public final class GemSlice extends Slice.Wrap {
                         new RtRule.ByPath("/api/v1/gems")
                     ),
                     new AuthzSlice(
-                        new SubmitGemSlice(storage),
+                        new SubmitGemSlice(storage, events, name),
                         new GemApiKeyAuth(auth),
                         new OperationControl(
                             policy, new AdapterBasicPermission(name, Action.Standard.WRITE)
