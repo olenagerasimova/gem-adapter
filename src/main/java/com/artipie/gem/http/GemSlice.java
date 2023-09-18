@@ -20,10 +20,11 @@ import com.artipie.http.rt.SliceRoute;
 import com.artipie.http.slice.SliceDownload;
 import com.artipie.http.slice.SliceSimple;
 import com.artipie.scheduling.ArtifactEvent;
-import com.artipie.scheduling.EventQueue;
 import com.artipie.security.perms.Action;
 import com.artipie.security.perms.AdapterBasicPermission;
 import com.artipie.security.policy.Policy;
+import java.util.Optional;
+import java.util.Queue;
 
 /**
  * A slice, which servers gem packages.
@@ -42,7 +43,7 @@ public final class GemSlice extends Slice.Wrap {
      * @param storage The storage.
      */
     public GemSlice(final Storage storage) {
-        this(storage, Policy.FREE, Authentication.ANONYMOUS, "", new EventQueue<>());
+        this(storage, Policy.FREE, Authentication.ANONYMOUS, "", Optional.empty());
     }
 
     /**
@@ -51,7 +52,7 @@ public final class GemSlice extends Slice.Wrap {
      * @param storage The storage.
      * @param events Artifact events queue
      */
-    public GemSlice(final Storage storage, final EventQueue<ArtifactEvent> events) {
+    public GemSlice(final Storage storage, final Optional<Queue<ArtifactEvent>> events) {
         this(storage, Policy.FREE, Authentication.ANONYMOUS, "", events);
     }
 
@@ -69,7 +70,7 @@ public final class GemSlice extends Slice.Wrap {
         final Authentication auth,
         final String name
     ) {
-        this(storage, policy, auth, name, new EventQueue<>());
+        this(storage, policy, auth, name, Optional.empty());
     }
 
     /**
@@ -86,7 +87,7 @@ public final class GemSlice extends Slice.Wrap {
         final Policy<?> policy,
         final Authentication auth,
         final String name,
-        final EventQueue<ArtifactEvent> events
+        final Optional<Queue<ArtifactEvent>> events
     ) {
         super(
             new SliceRoute(
