@@ -81,12 +81,13 @@ final class SubmitGemSlice implements Slice {
         final Key key = new Key.From(
             "gems", UUID.randomUUID().toString().replace("-", "").concat(".gem")
         );
+        // @checkstyle ReturnCountCheck (50 lines)
         return new AsyncResponse(
             this.storage.save(
                 key, new ContentWithSize(body, headers)
             ).thenCompose(
                 none -> {
-                    CompletionStage<Pair<String, String>> update = this.gem.update(key);
+                    final CompletionStage<Pair<String, String>> update = this.gem.update(key);
                     if (this.events.isPresent()) {
                         return update.thenCompose(
                             pair -> new RqHeaders(headers, "content-length").stream().findFirst()
@@ -105,7 +106,7 @@ final class SubmitGemSlice implements Slice {
                                 )
                         );
                     } else {
-                        return update.thenAccept(pair -> {});
+                        return update.thenAccept(pair -> { });
                     }
                 }
             )
