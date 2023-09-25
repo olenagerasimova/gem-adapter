@@ -18,11 +18,14 @@ import com.artipie.http.rs.RsStatus;
 import com.artipie.http.rs.RsWithStatus;
 import com.artipie.http.slice.ContentWithSize;
 import com.artipie.scheduling.ArtifactEvent;
-import com.artipie.scheduling.EventQueue;
 import java.nio.ByteBuffer;
 import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import org.apache.commons.lang3.tuple.Pair;
 import org.reactivestreams.Publisher;
 
 /**
@@ -50,7 +53,7 @@ final class SubmitGemSlice implements Slice {
     /**
      * Artifact events.
      */
-    private final EventQueue<ArtifactEvent> events;
+    private final Optional<Queue<ArtifactEvent>> events;
 
     /**
      * Repository name.
@@ -64,7 +67,7 @@ final class SubmitGemSlice implements Slice {
      * @param events Artifact events
      * @param name Repository name
      */
-    SubmitGemSlice(final Storage storage, final EventQueue<ArtifactEvent> events,
+    SubmitGemSlice(final Storage storage, final Optional<Queue<ArtifactEvent>> events,
         final String name) {
         this.storage = storage;
         this.gem = new Gem(storage);
@@ -78,28 +81,35 @@ final class SubmitGemSlice implements Slice {
         final Key key = new Key.From(
             "gems", UUID.randomUUID().toString().replace("-", "").concat(".gem")
         );
+        // @checkstyle ReturnCountCheck (50 lines)
         return new AsyncResponse(
             this.storage.save(
                 key, new ContentWithSize(body, headers)
             ).thenCompose(
-                none -> this.gem.update(key).thenCompose(
-                    pair -> new RqHeaders(headers, "content-length")
-                        .stream().findFirst().map(Long::parseLong)
-                        .map(CompletableFuture::completedFuture)
-                        .orElseGet(
-                            () -> this.storage.metadata(key)
-                                .thenApply(mets -> mets.read(Meta.OP_SIZE).get())
-                        ).thenAccept(
-                            size -> this.events.put(
-                                new ArtifactEvent(
-                                    SubmitGemSlice.REPO_TYPE, this.name,
-                                    new Login(new Headers.From(headers)).getValue(),
-                                    pair.getKey(), pair.getValue(), size
+                none -> {
+                    final CompletionStage<Pair<String, String>> update = this.gem.update(key);
+                    if (this.events.isPresent()) {
+                        return update.thenCompose(
+                            pair -> new RqHeaders(headers, "content-length").stream().findFirst()
+                                .map(Long::parseLong).map(CompletableFuture::completedFuture)
+                                .orElseGet(
+                                    () -> this.storage.metadata(key)
+                                        .thenApply(mets -> mets.read(Meta.OP_SIZE).get())
+                                ).thenAccept(
+                                    size -> this.events.get().add(
+                                        new ArtifactEvent(
+                                            SubmitGemSlice.REPO_TYPE, this.name,
+                                            new Login(new Headers.From(headers)).getValue(),
+                                            pair.getKey(), pair.getValue(), size
+                                        )
+                                    )
                                 )
-                            )
-                        )
-                    )
-                )
+                        );
+                    } else {
+                        return update.thenAccept(pair -> { });
+                    }
+                }
+            )
                 .thenCompose(none -> this.storage.delete(key))
                 .thenApply(none -> new RsWithStatus(RsStatus.CREATED))
         );
